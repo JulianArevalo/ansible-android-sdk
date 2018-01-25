@@ -1,0 +1,6 @@
+.vagrant
+*.retry
+
+# Vim files
+*.swp
+*.swo
