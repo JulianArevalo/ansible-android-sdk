@@ -1,0 +1,16 @@
+---
+- hosts: all
+  name: Test ansible-android-sdk role
+
+  vars:
+    tools_path: ~/tools
+    java_sudo_pass: "vagrant"
+    android_sdk_packages:
+      - name: build-tools
+        version: 22.0.1
+      - name: platforms
+        version: android-19
+      - name: platform-tools
+
+  roles:
+    - role: ../../ansible-android-sdk

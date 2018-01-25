@@ -1,0 +1,102 @@
+---
+# tasks file for ansible-android-sdk
+
+- name: "Check if java is installed"
+  shell: "command -v java"
+  register: java_installed
+  failed_when: java_installed.rc != 0
+
+- name: "Install specific Ubuntu packages for 64 bits"
+  apt:
+    name: "{{item}}"
+    update_cache: yes
+  when: ansible_distribution == "Ubuntu" and ansible_architecture == "x86_64"
+  become: yes
+  with_items:
+    - libc6:i386
+    - libncurses5:i386
+    - libstdc++6:i386
+    - lib32z1
+    - libbz2-1.0:i386
+    - unzip
+
+- name: "Create url"
+  set_fact:
+    sdk_url="https://dl.google.com/android/repository/sdk-tools-{{ ansible_system | lower }}-3859397.zip"
+
+- name: "Check if already downloaded"
+  stat:
+    path: "{{tools_path}}/{{sdk_url | basename}}"
+  register: download
+
+- name: "Ensures if destination folder exists"
+  file:
+    path={{tools_path}}
+    state=directory
+  when: download.stat.exists == false
+
+- name: Download latest Android SDK
+  get_url:
+    url: "{{ sdk_url }}"
+    dest: "{{tools_path}}"
+    validate_certs: no
+  when: download.stat.exists == false
+
+- name: Check if already unarchived
+  stat:
+    path: "{{tools_path}}/android-sdk/tools"
+  register: unarchived
+
+- name: "Ensure destination folder exists"
+  file:
+    path={{tools_path}}/android-sdk
+    state=directory
+  when: unarchived.stat.exists == false
+
+- name: Extract SDK
+  unarchive:
+    src: "{{ tools_path }}/{{ sdk_url | basename }}"
+    dest: "{{ tools_path }}/android-sdk"
+    remote_src: yes
+  when: unarchived.stat.exists == false
+
+- name: "Check if ~/.android/repositories.cfg exist"
+  stat:
+     path: ~/.android/repositories.cfg
+  register: repo
+
+- name: "Ensure ~/.android exists"
+  file:
+    path=~/.android
+    state=directory
+  when: repo.stat.exists == false
+
+- name: "Touch ~/.android/repositories.cfg"
+  file:
+    path: ~/.android/repositories.cfg
+    state: touch
+  when: repo.stat.exists == false
+
+- name: Install specific version of Android SDK packages
+  shell: bash -lc "{{ tools_path }}/android-sdk/tools/bin/sdkmanager \"{{ item.name }};{{ item.version }}\""
+  register: buildtools
+  with_items: "{{ android_sdk_packages }}"
+  when: item.version is defined and ansible_distribution == "MacOSX"
+
+- name: Install latest version of Android SDK packages
+  shell: bash -lc "{{ tools_path }}/android-sdk/tools/bin/sdkmanager \"{{ item.name }}\""
+  register: buildtools
+  with_items: "{{ android_sdk_packages }}"
+  when: item.version is not defined and ansible_distribution == "MacOSX"
+
+- name: Install specific version of Android SDK packages
+  shell: bash -lc "yes | {{ tools_path }}/android-sdk/tools/bin/sdkmanager \"{{ item.name }};{{ item.version }}\""
+  register: buildtools
+  with_items: "{{ android_sdk_packages }}"
+  when: item.version is defined and ansible_distribution == "Ubuntu"
+
+- name: Install latest version of Android SDK packages
+  shell: bash -lc "yes | {{ tools_path }}/android-sdk/tools/bin/sdkmanager \"{{ item.name }}\""
+  register: buildtools
+  with_items: "{{ android_sdk_packages }}"
+  when: item.version is not defined and ansible_distribution == "Ubuntu"
